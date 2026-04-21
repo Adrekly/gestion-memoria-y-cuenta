@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: uneg_api
+    ports:
+      - "8000:8000"
+    depends_on:
+      - ollama
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+    # Agregamos este volumen para que los cambios en main.py se reflejen en vivo
+    volumes:
+      - .:/app
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: uneg_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+  frontend:
+    build: ./frontend-uneg
+    container_name: uneg_frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+    # Volumen para que Vite recargue en vivo si modificas el código de React
+    volumes:
+      - ./frontend-uneg:/app
+      - /app/node_modules
+
+volumes:
+  ollama_data:
