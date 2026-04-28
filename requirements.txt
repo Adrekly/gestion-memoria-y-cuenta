@@ -1,5 +1,11 @@
 fastapi
 uvicorn
+motor
+pydantic[email]
+pydantic-settings
 langchain
 langchain-community
-pydantic
+python-multipart
+fpdf2
+openpyxl
+python-dateutil

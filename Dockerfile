@@ -1,18 +1,18 @@
-# Usamos una imagen ligera de Python
+# Imagen ligera de Python
 FROM python:3.11-slim
 
-# Establecemos el directorio de trabajo dentro del contenedor
+# Directorio de trabajo
 WORKDIR /app
 
-# Copiamos los requerimientos y los instalamos
+# Copiar e instalar dependencias
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiamos el resto del código del backend
+# Copiar código
 COPY . .
 
-# Exponemos el puerto en el que corre FastAPI
+# Puerto de FastAPI
 EXPOSE 8000
 
-# Comando para iniciar el servidor
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Usar el nuevo entry point modular (app/main.py)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
