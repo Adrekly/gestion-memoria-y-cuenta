@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Package, Building2, AlertTriangle, DollarSign, TrendingUp, Activity } from 'lucide-react';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { Package, Building2, AlertTriangle, DollarSign, TrendingUp, Activity, ShieldAlert, ArrowLeftRight, Wrench } from 'lucide-react';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { bienesAPI } from '../services/api';
 
 const COLORS = ['#003366', '#4A90D9', '#C4A35A', '#2ECC71', '#E74C3C', '#9B59B6', '#F39C12', '#1ABC9C'];
+const CONDICION_COLORS = { BUENO: '#2ECC71', REGULAR: '#F39C12', MALO: '#E74C3C' };
 
 function KPICard({ icon: Icon, label, value, color, sub }) {
   return (
@@ -50,6 +51,7 @@ export default function Dashboard() {
   const sedeData = Object.entries(stats.por_sede || {}).map(([name, value]) => ({ name, value }));
   const estadoData = Object.entries(stats.por_estado || {}).map(([name, value]) => ({ name, value }));
   const grupoData = Object.entries(stats.por_grupo_sudebip || {}).map(([name, value]) => ({ name: name.substring(0, 25), value }));
+  const condicionData = Object.entries(stats.por_condicion || {}).map(([name, value]) => ({ name, value }));
 
   const faltantes = stats.por_estado?.FALTANTE || 0;
   const enUso = stats.por_estado?.EN_USO || 0;
@@ -67,6 +69,7 @@ export default function Dashboard() {
         <KPICard icon={TrendingUp} label="En Uso" value={enUso} color="#2ECC71" sub={`${stats.total_bienes ? ((enUso / stats.total_bienes) * 100).toFixed(0) : 0}% del total`} />
         <KPICard icon={DollarSign} label="Valor Total" value={`$${(stats.valor_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`} color="#C4A35A" sub="Patrimonio activo" />
         <KPICard icon={AlertTriangle} label="Faltantes" value={faltantes} color={faltantes > 0 ? '#E74C3C' : '#2ECC71'} sub={faltantes > 0 ? 'Requiere atencion' : 'Sin novedades'} />
+        <KPICard icon={ShieldAlert} label="Bajas Pendientes" value={stats.desincorporaciones_pendientes || 0} color={stats.desincorporaciones_pendientes > 0 ? '#F39C12' : '#2ECC71'} sub={stats.desincorporaciones_pendientes > 0 ? 'Solicitudes por revisar' : 'Al dia'} />
       </div>
 
       {/* Charts */}
@@ -112,6 +115,23 @@ export default function Dashboard() {
           )}
         </div>
 
+        {/* Por Condición */}
+        {condicionData.length > 0 && (
+          <div className="chart-card">
+            <h3 className="chart-card__title">
+              <Wrench size={18} /> Condicion de los Bienes
+            </h3>
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie data={condicionData} cx="50%" cy="50%" innerRadius={55} outerRadius={90} dataKey="value" label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`} labelLine={true}>
+                  {condicionData.map((entry, i) => <Cell key={i} fill={CONDICION_COLORS[entry.name] || COLORS[i % COLORS.length]} />)}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
         {/* Por Grupo SUDEBIP */}
         {grupoData.length > 0 && (
           <div className="chart-card chart-card--wide">
@@ -130,6 +150,33 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Últimos Movimientos */}
+      {stats.ultimos_movimientos && stats.ultimos_movimientos.length > 0 && (
+        <div style={{ marginTop: '16px' }}>
+          <div className="chart-card">
+            <h3 className="chart-card__title">
+              <ArrowLeftRight size={18} /> Ultimos Movimientos
+            </h3>
+            <table className="data-table">
+              <thead>
+                <tr><th>Fecha</th><th>Tipo</th><th>Bien</th><th>Descripcion</th><th>Autorizado</th></tr>
+              </thead>
+              <tbody>
+                {stats.ultimos_movimientos.map((m, i) => (
+                  <tr key={i}>
+                    <td>{m.fecha ? new Date(m.fecha).toLocaleDateString('es-VE') : ''}</td>
+                    <td><span className="badge badge--outline">{m.tipo}</span></td>
+                    <td className="td-code">{m.bien}</td>
+                    <td>{m.descripcion}</td>
+                    <td>{m.autorizado_por}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

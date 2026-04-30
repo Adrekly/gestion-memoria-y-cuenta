@@ -12,6 +12,7 @@ from app.schemas.desincorporacion import (
     EstadoProceso,
 )
 from app.schemas.bien import EstadoBien
+from app.services.audit_service import registrar_auditoria
 
 router = APIRouter()
 
@@ -79,6 +80,14 @@ async def solicitar_desincorporacion(data: DesincorporacionCreate):
     doc["bien_descripcion"] = bien.get("descripcion")
     doc["bien_codigo_inventario"] = bien.get("codigo_inventario")
 
+    await registrar_auditoria(
+        accion="DESINCORPORAR",
+        coleccion="desincorporaciones",
+        documento_id=bien.get("codigo_inventario", str(doc["_id"])),
+        usuario=data.solicitado_por,
+        detalles={"motivo": data.motivo.value, "bien": bien.get("descripcion")},
+    )
+
     return _serialize(doc)
 
 
@@ -135,6 +144,15 @@ async def cambiar_estado_desincorporacion(desincorporacion_id: str, cambio: Desi
     if bien:
         result["bien_descripcion"] = bien.get("descripcion")
         result["bien_codigo_inventario"] = bien.get("codigo_inventario")
+
+    await registrar_auditoria(
+        accion=f"DESINCORPORACION_{cambio.estado.value}",
+        coleccion="desincorporaciones",
+        documento_id=bien.get("codigo_inventario", desincorporacion_id) if bien else desincorporacion_id,
+        usuario=cambio.aprobado_por,
+        detalles={"observaciones": cambio.observaciones},
+        cambios={"estado_proceso": {"anterior": desinc["estado_proceso"], "nuevo": cambio.estado.value}},
+    )
 
     return _serialize(result)
 

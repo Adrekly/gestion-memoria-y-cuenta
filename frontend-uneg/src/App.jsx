@@ -8,6 +8,8 @@ import Desincorporaciones from './pages/Desincorporaciones';
 import Reportes from './pages/Reportes';
 import Asistente from './pages/Asistente';
 import Sedes from './pages/Sedes';
+import Auditoria from './pages/Auditoria';
+import BienDetalle from './pages/BienDetalle';
 
 export default function App() {
   return (
@@ -21,11 +23,13 @@ export default function App() {
         <Route element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="/inventario" element={<Inventario />} />
+          <Route path="/inventario/:id" element={<BienDetalle />} />
           <Route path="/movimientos" element={<Movimientos />} />
           <Route path="/desincorporaciones" element={<Desincorporaciones />} />
           <Route path="/reportes" element={<Reportes />} />
           <Route path="/asistente" element={<Asistente />} />
           <Route path="/sedes" element={<Sedes />} />
+          <Route path="/auditoria" element={<Auditoria />} />
         </Route>
       </Routes>
     </BrowserRouter>

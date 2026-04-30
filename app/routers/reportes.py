@@ -9,8 +9,25 @@ from io import BytesIO
 
 from app.database import get_database
 from app.services.reporte_service import generar_bm1, generar_bm2, generar_bm3, generar_bm4
+from app.services.excel_service import generar_excel_inventario
 
 router = APIRouter()
+
+@router.get("/bm1/excel")
+async def reporte_bm1_excel(
+    sede: str | None = Query(None, description="Filtrar por código de sede"),
+):
+    """
+    Exportación cruda a Excel del inventario.
+    """
+    db = get_database()
+    excel_buffer = await generar_excel_inventario(db, sede=sede)
+
+    return StreamingResponse(
+        excel_buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=Inventario_General.xlsx"},
+    )
 
 
 @router.get("/bm1")

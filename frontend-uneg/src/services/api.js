@@ -27,8 +27,9 @@ async function request(endpoint, options = {}) {
     throw new Error(errorMessage);
   }
 
-  // Si es PDF, retornar blob
-  if (res.headers.get('content-type')?.includes('application/pdf')) {
+  // Si es PDF o Excel, retornar blob
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/pdf') || contentType.includes('spreadsheetml')) {
     return res.blob();
   }
   return res.json();
@@ -41,10 +42,12 @@ export const bienesAPI = {
     return request(`/bienes?${qs}`);
   },
   obtener: (id) => request(`/bienes/${id}`),
+  obtenerHistorial: (id) => request(`/bienes/${id}/historial`),
   crear: (data) => request('/bienes', { method: 'POST', body: JSON.stringify(data) }),
   actualizar: (id, data) => request(`/bienes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   cambiarEstado: (id, data) => request(`/bienes/${id}/estado`, { method: 'PATCH', body: JSON.stringify(data) }),
   estadisticas: () => request('/bienes/estadisticas'),
+  buscarCodigo: (q) => request(`/bienes/buscar-codigo?q=${encodeURIComponent(q)}`),
 };
 
 // === MOVIMIENTOS ===
@@ -80,7 +83,7 @@ export const clasificadorAPI = {
 
 // === CHAT ===
 export const chatAPI = {
-  consultar: (pregunta) => request('/chat', { method: 'POST', body: JSON.stringify({ pregunta }) }),
+  consultar: (pregunta, historial = []) => request('/chat', { method: 'POST', body: JSON.stringify({ pregunta, historial }) }),
 };
 
 // === REPORTES ===
@@ -88,6 +91,10 @@ export const reportesAPI = {
   bm1: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/reportes/bm1?${qs}`);
+  },
+  bm1Excel: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/reportes/bm1/excel?${qs}`);
   },
   bm2: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
@@ -100,5 +107,13 @@ export const reportesAPI = {
   bm4: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/reportes/bm4?${qs}`);
+  },
+};
+
+// === AUDITORIA ===
+export const auditoriaAPI = {
+  listar: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/auditoria?${qs}`);
   },
 };

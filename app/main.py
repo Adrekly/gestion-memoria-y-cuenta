@@ -12,7 +12,7 @@ from app.seeds.clasificador_seed import seed_clasificador
 from app.seeds.sedes_seed import seed_sedes
 
 # Importar routers
-from app.routers import bienes, movimientos, desincorporaciones, sedes, clasificador, chat, reportes
+from app.routers import bienes, movimientos, desincorporaciones, sedes, clasificador, chat, reportes, auditoria
 
 
 @asynccontextmanager
@@ -59,6 +59,7 @@ app.include_router(sedes.router, prefix="/api/sedes", tags=["Sedes"])
 app.include_router(clasificador.router, prefix="/api/clasificador", tags=["Clasificador SUDEBIP"])
 app.include_router(chat.router, prefix="/api/chat", tags=["Asistente IA"])
 app.include_router(reportes.router, prefix="/api/reportes", tags=["Reportes BM"])
+app.include_router(auditoria.router, prefix="/api/auditoria", tags=["Auditoria"])
 
 
 @app.get("/", tags=["Health"])

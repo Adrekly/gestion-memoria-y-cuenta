@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Filter, Eye, Edit, Package, X, Check, Loader } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Plus, Search, Filter, Eye, Edit, Package, X, Check, Loader, History } from 'lucide-react';
 import { bienesAPI, sedesAPI, clasificadorAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -29,6 +30,8 @@ export default function Inventario() {
     sede_codigo: '', ubicacion_especifica: '', responsable: '', cedula_responsable: '',
     departamento: '', observaciones: '',
   });
+
+  const [editingId, setEditingId] = useState(null);
 
   const [sugerenciasSudebip, setSugerenciasSudebip] = useState([]);
 
@@ -72,11 +75,20 @@ export default function Inventario() {
       const payload = {
         ...raw,
         valor_adquisicion: parseFloat(raw.valor_adquisicion),
-        fecha_adquisicion: new Date(raw.fecha_adquisicion).toISOString(),
       };
-      await bienesAPI.crear(payload);
-      toast.success('Bien registrado exitosamente');
+      if (raw.fecha_adquisicion) {
+         payload.fecha_adquisicion = new Date(raw.fecha_adquisicion).toISOString();
+      }
+      
+      if (editingId) {
+        await bienesAPI.actualizar(editingId, payload);
+        toast.success('Bien actualizado exitosamente');
+      } else {
+        await bienesAPI.crear(payload);
+        toast.success('Bien registrado exitosamente');
+      }
       setShowForm(false);
+      setEditingId(null);
       setForm({
         codigo_sudebip: '', grupo_sudebip: '', descripcion: '', marca: '', modelo: '',
         serial: '', valor_adquisicion: '', fecha_adquisicion: '', condicion: 'BUENO',
@@ -89,6 +101,28 @@ export default function Inventario() {
     } finally {
       setSending(false);
     }
+  };
+
+  const handleEdit = (bien) => {
+    setForm({
+      codigo_sudebip: bien.codigo_sudebip || '',
+      grupo_sudebip: bien.grupo_sudebip || '',
+      descripcion: bien.descripcion || '',
+      marca: bien.marca || '',
+      modelo: bien.modelo || '',
+      serial: bien.serial || '',
+      valor_adquisicion: bien.valor_adquisicion || '',
+      fecha_adquisicion: bien.fecha_adquisicion ? bien.fecha_adquisicion.split('T')[0] : '',
+      condicion: bien.condicion || 'BUENO',
+      sede_codigo: bien.sede?.codigo || '',
+      ubicacion_especifica: bien.ubicacion_especifica || '',
+      responsable: bien.responsable || '',
+      cedula_responsable: bien.cedula_responsable || '',
+      departamento: bien.departamento || '',
+      observaciones: bien.observaciones || '',
+    });
+    setEditingId(bien.id || bien._id);
+    setShowForm(true);
   };
 
   const totalPaginas = Math.ceil(total / 15);
@@ -151,7 +185,11 @@ export default function Inventario() {
                   <td>{b.condicion}</td>
                   <td className="td-money">${(b.valor_adquisicion || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</td>
                   <td>
-                    <button className="btn-icon" title="Ver detalle" onClick={() => setShowDetail(b)}><Eye size={16} /></button>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button className="btn-icon" title="Ver detalle rapido" onClick={() => setShowDetail(b)}><Eye size={16} /></button>
+                      <button className="btn-icon" title="Editar" onClick={() => handleEdit(b)}><Edit size={16} /></button>
+                      <Link to={`/inventario/${b.id || b._id}`} className="btn-icon" title="Historial completo"><History size={16} /></Link>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -174,8 +212,8 @@ export default function Inventario() {
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal__header">
-              <h3>Registrar Nuevo Bien</h3>
-              <button className="btn-icon" onClick={() => setShowForm(false)}><X size={20} /></button>
+              <h3>{editingId ? 'Editar Bien' : 'Registrar Nuevo Bien'}</h3>
+              <button className="btn-icon" onClick={() => { setShowForm(false); setEditingId(null); }}><X size={20} /></button>
             </div>
             <form onSubmit={handleSubmit} className="modal__body">
               <div className="form-grid">
@@ -229,9 +267,9 @@ export default function Inventario() {
                 <div className="form-group form-group--full"><label>Observaciones</label><textarea value={form.observaciones} onChange={e => setForm({...form, observaciones: e.target.value})} rows={2} /></div>
               </div>
               <div className="modal__actions">
-                <button type="button" className="btn btn--ghost" onClick={() => setShowForm(false)}>Cancelar</button>
+                <button type="button" className="btn btn--ghost" onClick={() => { setShowForm(false); setEditingId(null); }}>Cancelar</button>
                 <button type="submit" className="btn btn--primary" disabled={sending}>
-                  {sending ? <><Loader className="spin" size={16} /> Guardando...</> : <><Check size={16} /> Registrar Bien</>}
+                  {sending ? <><Loader className="spin" size={16} /> Guardando...</> : <><Check size={16} /> {editingId ? 'Actualizar Bien' : 'Registrar Bien'}</>}
                 </button>
               </div>
             </form>

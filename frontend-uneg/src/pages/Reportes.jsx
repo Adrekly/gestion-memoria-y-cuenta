@@ -23,10 +23,12 @@ export default function Reportes() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${id.toUpperCase()}_UNEG.pdf`;
+      const ext = id.includes('excel') ? 'xlsx' : 'pdf';
+      const cleanId = id.replace('/excel', '');
+      a.download = `${cleanId.toUpperCase()}_UNEG.${ext}`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success(`Reporte ${id.toUpperCase()} descargado`);
+      toast.success(`Reporte ${cleanId.toUpperCase()} descargado`);
     } catch (e) { toast.error(e.message); }
     finally { setGenerating(null); }
   };
@@ -49,13 +51,34 @@ export default function Reportes() {
             </div>
             <h3 className="reporte-card__title">{r.title}</h3>
             <p className="reporte-card__desc">{r.desc}</p>
-            <button
-              className="btn btn--primary btn--block"
-              onClick={() => descargar(r.id)}
-              disabled={generating === r.id}
-            >
-              {generating === r.id ? <><Loader className="spin" size={16} /> Generando...</> : <><Download size={16} /> Descargar PDF</>}
-            </button>
+            {r.id === 'bm1' ? (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  className="btn btn--primary btn--block"
+                  onClick={() => descargar(r.id)}
+                  disabled={generating === r.id}
+                  style={{ flex: 1 }}
+                >
+                  {generating === r.id ? <><Loader className="spin" size={16} /></> : <><Download size={16} /> PDF</>}
+                </button>
+                <button
+                  className="btn btn--secondary btn--block"
+                  onClick={() => descargar('bm1/excel')}
+                  disabled={generating === 'bm1/excel'}
+                  style={{ flex: 1, background: '#107c41', color: 'white', borderColor: '#107c41' }}
+                >
+                  {generating === 'bm1/excel' ? <><Loader className="spin" size={16} /></> : <><Download size={16} /> EXCEL</>}
+                </button>
+              </div>
+            ) : (
+              <button
+                className="btn btn--primary btn--block"
+                onClick={() => descargar(r.id)}
+                disabled={generating === r.id}
+              >
+                {generating === r.id ? <><Loader className="spin" size={16} /> Generando...</> : <><Download size={16} /> Descargar PDF</>}
+              </button>
+            )}
           </div>
         ))}
       </div>

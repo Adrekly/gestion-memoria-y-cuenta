@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, ArrowLeftRight, Loader, X, Check } from 'lucide-react';
-import { movimientosAPI, sedesAPI } from '../services/api';
+import { Plus, ArrowLeftRight, Loader, X, Check, Search, CheckCircle } from 'lucide-react';
+import { movimientosAPI, sedesAPI, bienesAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
 const TIPOS = ['ENTRADA', 'SALIDA', 'TRASLADO', 'REASIGNACION'];
@@ -14,6 +14,11 @@ export default function Movimientos() {
   const [sending, setSending] = useState(false);
   const [form, setForm] = useState({ codigo_inventario: '', tipo: 'TRASLADO', sede_destino: '', motivo: '', autorizado_por: '', documento_soporte: '' });
 
+  // Autocompletado
+  const [bienQuery, setBienQuery] = useState('');
+  const [sugerencias, setSugerencias] = useState([]);
+  const [bienSeleccionado, setBienSeleccionado] = useState(null);
+
   const cargar = async () => {
     setLoading(true);
     try {
@@ -26,14 +31,35 @@ export default function Movimientos() {
 
   useEffect(() => { cargar(); sedesAPI.listar().then(setSedes).catch(() => {}); }, []);
 
+  const buscarBienes = async (q) => {
+    setBienQuery(q);
+    if (q.length < 2) { setSugerencias([]); return; }
+    try {
+      const res = await bienesAPI.buscarCodigo(q);
+      setSugerencias(res);
+    } catch { setSugerencias([]); }
+  };
+
+  const seleccionarBien = (bien) => {
+    setForm({ ...form, codigo_inventario: bien.codigo_inventario });
+    setBienQuery(bien.codigo_inventario);
+    setBienSeleccionado(bien);
+    setSugerencias([]);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSending(true);
     try {
-      await movimientosAPI.crear(form);
+      const payload = { ...form };
+      if (!payload.sede_destino) payload.sede_destino = null;
+      if (!payload.documento_soporte) payload.documento_soporte = null;
+      await movimientosAPI.crear(payload);
       toast.success('Movimiento registrado');
       setShowForm(false);
       setForm({ codigo_inventario: '', tipo: 'TRASLADO', sede_destino: '', motivo: '', autorizado_por: '', documento_soporte: '' });
+      setBienQuery('');
+      setBienSeleccionado(null);
       cargar();
     } catch (e) { toast.error(e.message); }
     finally { setSending(false); }
@@ -79,7 +105,33 @@ export default function Movimientos() {
             <div className="modal__header"><h3>Registrar Movimiento</h3><button className="btn-icon" onClick={() => setShowForm(false)}><X size={20} /></button></div>
             <form onSubmit={handleSubmit} className="modal__body">
               <div className="form-grid">
-                <div className="form-group form-group--full"><label>Código Inventario *</label><input type="text" required value={form.codigo_inventario} onChange={e => setForm({...form, codigo_inventario: e.target.value})} placeholder="UNEG-ATL-03-00004" /></div>
+                <div className="form-group form-group--full" style={{ position: 'relative' }}>
+                  <label><Search size={14} style={{ marginRight: 4 }} />Buscar Bien *</label>
+                  <input
+                    type="text"
+                    required
+                    value={bienQuery}
+                    onChange={e => buscarBienes(e.target.value)}
+                    placeholder="Escriba código o descripción del bien..."
+                    autoComplete="off"
+                  />
+                  {sugerencias.length > 0 && (
+                    <ul className="autocomplete-list">
+                      {sugerencias.map(s => (
+                        <li key={s.codigo_inventario} className="autocomplete-item" onClick={() => seleccionarBien(s)}>
+                          <strong>{s.codigo_inventario}</strong>
+                          <span>{s.descripcion}</span>
+                          <small>{s.sede}</small>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {bienSeleccionado && (
+                    <p className="form-hint" style={{ color: '#2ECC71' }}>
+                      <CheckCircle size={12} /> {bienSeleccionado.descripcion} — {bienSeleccionado.sede}
+                    </p>
+                  )}
+                </div>
                 <div className="form-group"><label>Tipo *</label><select required value={form.tipo} onChange={e => setForm({...form, tipo: e.target.value})}>{TIPOS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
                 <div className="form-group"><label>Sede Destino</label><select value={form.sede_destino} onChange={e => setForm({...form, sede_destino: e.target.value})}><option value="">Seleccionar</option>{sedes.map(s => <option key={s.codigo} value={s.codigo}>{s.nombre}</option>)}</select></div>
                 <div className="form-group form-group--full"><label>Motivo *</label><input type="text" required value={form.motivo} onChange={e => setForm({...form, motivo: e.target.value})} /></div>

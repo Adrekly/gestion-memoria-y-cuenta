@@ -9,6 +9,7 @@ from app.database import get_database
 from app.schemas.movimiento import (
     MovimientoCreate, MovimientoResponse, MovimientoListResponse, TipoMovimiento,
 )
+from app.services.audit_service import registrar_auditoria
 
 router = APIRouter()
 
@@ -67,6 +68,20 @@ async def registrar_movimiento(mov: MovimientoCreate):
     # Agregar datos del bien para la respuesta
     doc["bien_descripcion"] = bien.get("descripcion")
     doc["bien_codigo_inventario"] = bien.get("codigo_inventario")
+
+    await registrar_auditoria(
+        accion="MOVIMIENTO",
+        coleccion="movimientos",
+        documento_id=bien.get("codigo_inventario", str(doc["_id"])),
+        usuario=mov.autorizado_por,
+        detalles={
+            "tipo": mov.tipo.value,
+            "bien": bien.get("descripcion"),
+            "sede_origen": doc["sede_origen"],
+            "sede_destino": mov.sede_destino,
+            "motivo": mov.motivo,
+        },
+    )
 
     return _serialize(doc)
 

@@ -42,6 +42,17 @@ async def _create_indexes() -> None:
     await db.bienes.create_index("estado")
     await db.bienes.create_index("sede.codigo")
     await db.bienes.create_index("departamento")
+    await db.bienes.create_index(
+        "serial",
+        unique=True,
+        partialFilterExpression={"serial": {"$type": "string", "$gt": ""}}
+    )  # Permite seriales nulos o vacíos sin chocar
+    await db.bienes.create_index([("sede.codigo", 1), ("estado", 1)])  # Compuesto para filtros
+    await db.bienes.create_index(
+        [("descripcion", "text"), ("codigo_inventario", "text")],
+        default_language="spanish",
+        name="idx_bienes_text"
+    )
 
     # Colección: movimientos
     await db.movimientos.create_index("bien_id")
@@ -49,7 +60,7 @@ async def _create_indexes() -> None:
     await db.movimientos.create_index("tipo")
 
     # Colección: desincorporaciones
-    await db.desincorporaciones.create_index("bien_id", unique=True)
+    await db.desincorporaciones.create_index("bien_id")
     await db.desincorporaciones.create_index("estado_proceso")
 
     # Colección: clasificador_sudebip
@@ -62,6 +73,12 @@ async def _create_indexes() -> None:
 
     # Colección: sedes
     await db.sedes.create_index("codigo", unique=True)
+
+    # Colección: audit_log
+    await db.audit_log.create_index("coleccion")
+    await db.audit_log.create_index("documento_id")
+    await db.audit_log.create_index("accion")
+    await db.audit_log.create_index("fecha")  # Podría configurarse un TTL si se desea
 
     print("[OK] Indices de MongoDB creados/verificados")
 

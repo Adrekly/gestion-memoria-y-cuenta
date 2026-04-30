@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     # --- Ollama (IA) ---
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "gemma:7b"
+    OLLAMA_MODEL: str = "llama3.2"
 
     # --- CORS ---
     CORS_ORIGINS: list[str] = ["*"]
