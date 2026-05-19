@@ -1,8 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Package, MapPin, Loader, Clock, Tag, User, AlignLeft, ShieldAlert, ArrowLeftRight, Wrench, CheckCircle } from 'lucide-react';
+import { ArrowLeft, MapPin, Loader, Clock, Tag, User, ArrowLeftRight, RefreshCw } from 'lucide-react';
 import { bienesAPI } from '../services/api';
 import toast from 'react-hot-toast';
+
+const ESTADOS_DISPONIBLES = [
+  { value: 'EN_USO',        label: 'En Uso' },
+  { value: 'EN_DESUSO',     label: 'En Desuso' },
+  { value: 'INSERVIBLE',   label: 'Inservible' },
+  { value: 'EN_REPARACION', label: 'En Reparación' },
+  { value: 'FALTANTE',     label: 'Faltante' },
+];
 
 const ACCION_LABELS = {
   CREAR: 'Registro Inicial',
@@ -19,10 +27,17 @@ export default function BienDetalle() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   
-  // Estados para Mantenimiento
+  // Estados para Cambio de Estado
   const [showModal, setShowModal] = useState(false);
+  const [nuevoEstado, setNuevoEstado] = useState('');
   const [motivo, setMotivo] = useState('');
   const [procesando, setProcesando] = useState(false);
+
+  const abrirModal = (bien) => {
+    setNuevoEstado(bien.estado);
+    setMotivo('');
+    setShowModal(true);
+  };
 
   useEffect(() => {
     bienesAPI.obtenerHistorial(id)
@@ -36,22 +51,25 @@ export default function BienDetalle() {
 
   const { bien, historial } = data;
 
-  const handleMantenimiento = async (e) => {
+  const handleCambioEstado = async (e) => {
     e.preventDefault();
-    if (!motivo.trim() || motivo.length < 5) {
-      toast.error('Ingrese un motivo detallado (mín. 5 caracteres)');
+    if (!motivo.trim() || motivo.length < 10) {
+      toast.error('Ingrese un motivo detallado (mín. 10 caracteres)');
       return;
     }
-    
+    if (nuevoEstado === bien.estado) {
+      toast.error('Seleccione un estado diferente al actual');
+      return;
+    }
+
     setProcesando(true);
     try {
-      const nuevoEstado = bien.estado === 'EN_REPARACION' ? 'EN_USO' : 'EN_REPARACION';
       await bienesAPI.cambiarEstado(bien._id, { estado: nuevoEstado, motivo });
-      
-      toast.success(nuevoEstado === 'EN_USO' ? 'Reparación finalizada' : 'Enviado a reparación');
+      const estadoLabel = ESTADOS_DISPONIBLES.find(e => e.value === nuevoEstado)?.label || nuevoEstado;
+      toast.success(`Estado actualizado a "${estadoLabel}"`);
       setShowModal(false);
       setMotivo('');
-      
+
       // Recargar datos
       const newData = await bienesAPI.obtenerHistorial(id);
       setData(newData);
@@ -80,18 +98,16 @@ export default function BienDetalle() {
           </p>
         </div>
         
-        {/* Acciones de Mantenimiento */}
-        {bien.estado !== 'DESINCORPORADO' && bien.estado !== 'FALTANTE' && (
+        {/* Acciones de Cambio de Estado */}
+        {bien.estado !== 'DESINCORPORADO' && (
           <div>
-            {bien.estado === 'EN_REPARACION' ? (
-              <button className="btn btn--primary" onClick={() => setShowModal(true)}>
-                <CheckCircle size={16} /> Finalizar Reparación
-              </button>
-            ) : (
-              <button className="btn btn--secondary" onClick={() => setShowModal(true)} style={{ background: '#f59e0b', color: 'white', borderColor: '#f59e0b' }}>
-                <Wrench size={16} /> Enviar a Reparación
-              </button>
-            )}
+            <button
+              className="btn btn--secondary"
+              onClick={() => abrirModal(bien)}
+              style={{ background: '#4A90D9', color: 'white', borderColor: '#4A90D9' }}
+            >
+              <RefreshCw size={16} /> Cambiar Estado
+            </button>
           </div>
         )}
       </div>
@@ -158,36 +174,59 @@ export default function BienDetalle() {
         )}
       </div>
 
-      {/* Modal Mantenimiento */}
+      {/* Modal Cambio de Estado */}
       {showModal && (
-        <div className="modal-backdrop">
-          <div className="modal">
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal modal--sm" onClick={e => e.stopPropagation()}>
             <div className="modal__header">
-              <h3>{bien.estado === 'EN_REPARACION' ? 'Finalizar Reparación' : 'Enviar a Reparación'}</h3>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <RefreshCw size={18} color="var(--accent)" /> Cambiar Estado del Bien
+              </h3>
             </div>
-            <div className="modal__body">
-              <form onSubmit={handleMantenimiento}>
-                <div className="form-group">
-                  <label>{bien.estado === 'EN_REPARACION' ? 'Reporte de la reparación realizada' : 'Motivo / Falla que presenta el bien'}</label>
-                  <textarea
-                    className="form-input"
-                    value={motivo}
-                    onChange={(e) => setMotivo(e.target.value)}
-                    placeholder="Escriba los detalles aquí..."
-                    rows={4}
-                    required
-                  ></textarea>
+            <form onSubmit={handleCambioEstado} className="modal__body">
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label>Estado actual</label>
+                <div style={{ padding: '8px 12px', background: 'var(--bg-input)', borderRadius: 'var(--radius-sm)', fontSize: '13px', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+                  {ESTADOS_DISPONIBLES.find(e => e.value === bien.estado)?.label || bien.estado}
                 </div>
-                <div className="modal__footer">
-                  <button type="button" className="btn btn--ghost" onClick={() => setShowModal(false)} disabled={procesando}>
-                    Cancelar
-                  </button>
-                  <button type="submit" className="btn btn--primary" disabled={procesando}>
-                    {procesando ? <Loader className="spin" size={16} /> : 'Confirmar'}
-                  </button>
-                </div>
-              </form>
-            </div>
+              </div>
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label>Nuevo estado *</label>
+                <select
+                  value={nuevoEstado}
+                  onChange={e => setNuevoEstado(e.target.value)}
+                  required
+                  style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '10px 12px', color: 'var(--text)', fontSize: '13px', width: '100%' }}
+                >
+                  {ESTADOS_DISPONIBLES.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Motivo del cambio * (mín. 10 caracteres)</label>
+                <textarea
+                  value={motivo}
+                  onChange={e => setMotivo(e.target.value)}
+                  placeholder="Describa el motivo del cambio de estado..."
+                  rows={4}
+                  required
+                  minLength={10}
+                  style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '10px 12px', color: 'var(--text)', fontSize: '13px', width: '100%', fontFamily: 'inherit', resize: 'vertical' }}
+                />
+                <span style={{ fontSize: '11px', color: motivo.length < 10 ? 'var(--warning)' : 'var(--success)', marginTop: '4px', display: 'block' }}>
+                  {motivo.length} / 10 caracteres mínimos
+                </span>
+              </div>
+              <div className="modal__actions">
+                <button type="button" className="btn btn--ghost" onClick={() => setShowModal(false)} disabled={procesando}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn--primary" disabled={procesando || motivo.length < 10 || nuevoEstado === bien.estado}>
+                  {procesando ? <Loader className="spin" size={16} /> : <><RefreshCw size={14} /> Confirmar Cambio</>}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
