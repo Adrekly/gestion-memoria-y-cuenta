@@ -1,8 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Filter, Eye, Edit, Package, X, Check, Loader, History } from 'lucide-react';
+import { Plus, Search, Eye, Edit, Package, X, Check, Loader, History, Wrench, RefreshCw } from 'lucide-react';
 import { bienesAPI, sedesAPI, clasificadorAPI } from '../services/api';
 import toast from 'react-hot-toast';
+
+const ESTADOS_DISPONIBLES = [
+  { value: 'EN_USO',        label: 'En Uso' },
+  { value: 'EN_DESUSO',     label: 'En Desuso' },
+  { value: 'INSERVIBLE',   label: 'Inservible' },
+  { value: 'EN_REPARACION', label: 'En Reparación' },
+  { value: 'FALTANTE',     label: 'Faltante' },
+];
 
 const ESTADOS = ['EN_USO', 'EN_DESUSO', 'INSERVIBLE', 'EN_REPARACION', 'FALTANTE', 'DESINCORPORADO'];
 const CONDICIONES = ['BUENO', 'REGULAR', 'MALO'];
@@ -23,6 +31,13 @@ export default function Inventario() {
   const [showForm, setShowForm] = useState(false);
   const [showDetail, setShowDetail] = useState(null);
   const [sending, setSending] = useState(false);
+
+  // Estado para modal de cambio de estado
+  const [showMaintModal, setShowMaintModal] = useState(false);
+  const [maintBien, setMaintBien] = useState(null);
+  const [maintNuevoEstado, setMaintNuevoEstado] = useState('');
+  const [maintMotivo, setMaintMotivo] = useState('');
+  const [maintProcesando, setMaintProcesando] = useState(false);
 
   const [form, setForm] = useState({
     codigo_sudebip: '', grupo_sudebip: '', descripcion: '', marca: '', modelo: '',
@@ -127,6 +142,38 @@ export default function Inventario() {
 
   const totalPaginas = Math.ceil(total / 15);
 
+  const abrirCambioEstado = (bien) => {
+    setMaintBien(bien);
+    setMaintNuevoEstado(bien.estado);
+    setMaintMotivo('');
+    setShowDetail(null); // cerrar detalle rápido si estaba abierto
+    setShowMaintModal(true);
+  };
+
+  const handleCambioEstado = async (e) => {
+    e.preventDefault();
+    if (!maintMotivo.trim() || maintMotivo.length < 10) {
+      toast.error('El motivo debe tener al menos 10 caracteres');
+      return;
+    }
+    if (maintNuevoEstado === maintBien.estado) {
+      toast.error('Seleccione un estado diferente al actual');
+      return;
+    }
+    setMaintProcesando(true);
+    try {
+      await bienesAPI.cambiarEstado(maintBien.id || maintBien._id, { estado: maintNuevoEstado, motivo: maintMotivo });
+      const estadoLabel = ESTADOS_DISPONIBLES.find(e => e.value === maintNuevoEstado)?.label || maintNuevoEstado;
+      toast.success(`Estado actualizado a "${estadoLabel}"`);
+      setShowMaintModal(false);
+      cargarBienes();
+    } catch (err) {
+      toast.error('Error: ' + err.message);
+    } finally {
+      setMaintProcesando(false);
+    }
+  };
+
   return (
     <div className="page">
       <div className="page__header">
@@ -188,7 +235,17 @@ export default function Inventario() {
                     <div style={{ display: 'flex', gap: '4px' }}>
                       <button className="btn-icon" title="Ver detalle rapido" onClick={() => setShowDetail(b)}><Eye size={16} /></button>
                       <button className="btn-icon" title="Editar" onClick={() => handleEdit(b)}><Edit size={16} /></button>
-                      <Link to={`/inventario/${b.id || b._id}`} className="btn-icon" title="Historial completo"><History size={16} /></Link>
+                      <Link to={`/inventario/${b.id || b._id}`} className="btn-icon" title="Ficha y historial completo"><History size={16} /></Link>
+                      {b.estado !== 'DESINCORPORADO' && (
+                        <button
+                          className="btn-icon"
+                          title="Cambiar Estado"
+                          onClick={() => abrirCambioEstado(b)}
+                          style={{ color: '#4A90D9' }}
+                        >
+                          <Wrench size={16} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -295,7 +352,7 @@ export default function Inventario() {
                 ['Modelo', showDetail.modelo],
                 ['Serial', showDetail.serial],
                 ['Valor', `$${(showDetail.valor_adquisicion || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`],
-                ['Estado', showDetail.estado],
+                ['Estado', showDetail.estado?.replace(/_/g, ' ')],
                 ['Condicion', showDetail.condicion],
                 ['Sede', showDetail.sede?.nombre],
                 ['Ubicacion', showDetail.ubicacion_especifica],
@@ -309,6 +366,91 @@ export default function Inventario() {
                 </div>
               ))}
             </div>
+            {showDetail.estado !== 'DESINCORPORADO' && (
+              <div className="modal__actions">
+                <Link
+                  to={`/inventario/${showDetail.id || showDetail._id}`}
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => setShowDetail(null)}
+                >
+                  <History size={14} /> Ver Ficha Completa
+                </Link>
+                <button
+                  className="btn btn--primary btn--sm"
+                  onClick={() => abrirCambioEstado(showDetail)}
+                >
+                  <Wrench size={14} /> Cambiar Estado
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cambio de Estado */}
+      {showMaintModal && maintBien && (
+        <div className="modal-overlay" onClick={() => setShowMaintModal(false)}>
+          <div className="modal modal--sm" onClick={e => e.stopPropagation()}>
+            <div className="modal__header">
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <RefreshCw size={18} color="var(--accent)" /> Cambiar Estado del Bien
+              </h3>
+              <button className="btn-icon" onClick={() => setShowMaintModal(false)}><X size={20} /></button>
+            </div>
+            <form onSubmit={handleCambioEstado} className="modal__body">
+              <div className="form-group" style={{ marginBottom: '8px' }}>
+                <label>Bien</label>
+                <div style={{ padding: '8px 12px', background: 'var(--bg-input)', borderRadius: 'var(--radius-sm)', fontSize: '13px', color: 'var(--accent)', border: '1px solid var(--border)', fontWeight: 600 }}>
+                  {maintBien.codigo_inventario} — {maintBien.descripcion}
+                </div>
+              </div>
+              <div className="form-group" style={{ marginBottom: '8px' }}>
+                <label>Estado actual</label>
+                <div style={{ padding: '8px 12px', background: 'var(--bg-input)', borderRadius: 'var(--radius-sm)', fontSize: '13px', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+                  {ESTADOS_DISPONIBLES.find(e => e.value === maintBien.estado)?.label || maintBien.estado}
+                </div>
+              </div>
+              <div className="form-group" style={{ marginBottom: '8px' }}>
+                <label>Nuevo estado *</label>
+                <select
+                  value={maintNuevoEstado}
+                  onChange={e => setMaintNuevoEstado(e.target.value)}
+                  required
+                  style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '10px 12px', color: 'var(--text)', fontSize: '13px', width: '100%' }}
+                >
+                  {ESTADOS_DISPONIBLES.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: '4px' }}>
+                <label>Motivo del cambio * (mín. 10 caracteres)</label>
+                <textarea
+                  value={maintMotivo}
+                  onChange={e => setMaintMotivo(e.target.value)}
+                  placeholder="Describa el motivo del cambio de estado..."
+                  rows={4}
+                  required
+                  minLength={10}
+                  style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '10px 12px', color: 'var(--text)', fontSize: '13px', width: '100%', fontFamily: 'inherit', resize: 'vertical' }}
+                />
+                <span style={{ fontSize: '11px', color: maintMotivo.length < 10 ? 'var(--warning)' : 'var(--success)', marginTop: '4px', display: 'block' }}>
+                  {maintMotivo.length} / 10 caracteres mínimos
+                </span>
+              </div>
+              <div className="modal__actions">
+                <button type="button" className="btn btn--ghost" onClick={() => setShowMaintModal(false)} disabled={maintProcesando}>
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn--primary"
+                  disabled={maintProcesando || maintMotivo.length < 10 || maintNuevoEstado === maintBien.estado}
+                >
+                  {maintProcesando ? <Loader className="spin" size={16} /> : <><RefreshCw size={14} /> Confirmar Cambio</>}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
